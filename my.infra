@@ -1,0 +1,113 @@
+#aunthenticate with aws
+provider "aws" {
+  region = "us-east-1"
+  access_key = "AKIA5C73LMYED33ZTFSQ"
+  secret_key = "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"
+  }
+
+#create vpc
+resource "aws_vpc" "demo_vpc" {
+  cidr_block       = "10.0.0.0/16"
+  instance_tenancy = "default"
+ enable_dns_hostnames = false 
+
+  tags = {
+    Name = "dev"
+  }
+}
+
+resource "aws_subnet" "demo_subnet" {
+  vpc_id            = aws_vpc.demo_vpc.id
+  cidr_block        = "10.0.1.0/24"
+ map_public_ip_on_launch = true
+ availability_zone = "us-east-1a" 
+
+  tags = {
+    Name = "dev_subnet"
+  }
+}
+
+#create internet gateway
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.demo_vpc.id
+
+  tags = {
+    Name = "demo_igw"
+  }
+}
+
+#create route table
+resource "aws_route_table" "dev_route_table" {
+  vpc_id = aws_vpc.demo_vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
+
+  tags = {
+    Name = "demo_r"
+  }
+}
+
+#route table association
+resource "aws_route_table_association" "a" {
+  subnet_id      = aws_subnet.demo_subnet.id
+  route_table_id = aws_route_table.dev_route_table.id
+}
+
+#create security group
+resource "aws_security_group" "web_sg" {
+  name   = "HTTPS,HTTP and SSH "
+  description = "allow https,http and ssh inbound traffic"
+  vpc_id = aws_vpc.demo_vpc.id
+
+  ingress {
+    description = "allow https traffic from vpc"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+    ingress {
+    description = "allow http traffic from vpc"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "allow ssh traffic from vpc"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = -1
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+
+
+
+#create EC2 instance
+ resource "aws_instance" "first_server" {
+  ami           = "ami-053b0d53c279acc90"
+  instance_type = "t2.micro"
+  subnet_id = aws_subnet.demo_subnet.id
+  vpc_security_group_ids = [aws_security_group.web_sg.id]
+  availability_zone = "us-east-1a"
+  key_name = "fridaykp"
+
+
+  tags = {
+    Name = "first_server"
+   }
+ }
